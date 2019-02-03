@@ -1329,7 +1329,7 @@ export default class Select extends Component<Props, State> {
     );
   }
 
-  toOption = (option: OptionsType, id: string, nextValue: OptionsType, inputValue: string) => {
+  toOption = (option: OptionType, id: string, nextValue: OptionsType, inputValue: string) => {
     const { value: valueToClean } = this.props;
     const selectValue = nextValue !== undefined ? nextValue : cleanValue(valueToClean);
     inputValue = inputValue || this.props.inputValue || '';
