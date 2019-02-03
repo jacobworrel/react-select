@@ -158,6 +158,8 @@ export type Props = {
   isDisabled: boolean,
   /* Is the select in a state of loading (async) */
   isLoading: boolean,
+  /* Is the MenuList component windowed */
+  isWindowed: boolean,
   /*
     Override the built-in logic to detect whether an option is disabled
 
@@ -1001,7 +1003,7 @@ export default class Select extends Component<Props, State> {
     if (!touch) {
       return;
     }
-    
+
     this.initialTouchX = touch.clientX;
     this.initialTouchY = touch.clientY;
     this.userIsDragging = false;
@@ -1315,7 +1317,7 @@ export default class Select extends Component<Props, State> {
             });
           }
         } else {
-          const option = toOption(item, `${itemIndex}`);
+          const option = this.toOption(item, `${itemIndex}`, selectValue, inputValue);
           if (option) {
             acc.render.push(option);
             if (!option.isDisabled) acc.focusable.push(item);
@@ -1326,6 +1328,126 @@ export default class Select extends Component<Props, State> {
       { render: [], focusable: [] }
     );
   }
+
+  toOption = (option: OptionsType, id: string, nextValue: OptionsType, inputValue: string) => {
+    const { value: valueToClean } = this.props;
+    const selectValue = nextValue !== undefined ? nextValue : cleanValue(valueToClean);
+    inputValue = inputValue || this.props.inputValue || '';
+    const isDisabled = this.isOptionDisabled(option, selectValue);
+    const isSelected = this.isOptionSelected(option, selectValue);
+    const label = this.getOptionLabel(option);
+    const value = this.getOptionValue(option);
+
+    if (
+      (this.shouldHideSelectedOptions() && isSelected) ||
+      !this.filterOption({ label, value, data: option }, inputValue)
+    ) {
+      return;
+    }
+
+    const onHover = isDisabled ? undefined : () => this.onOptionHover(option);
+    const onSelect = isDisabled ? undefined : () => this.selectOption(option);
+    const optionId = `${this.getElementId('option')}-${id}`;
+
+    return {
+      innerProps: {
+        id: optionId,
+        onClick: onSelect,
+        onMouseMove: onHover,
+        onMouseOver: onHover,
+        role: 'option',
+        tabIndex: -1,
+      },
+      data: option,
+      isDisabled,
+      isSelected,
+      key: optionId,
+      label,
+      type: 'option',
+      value,
+    };
+  };
+
+  // buildMenuOptions(props: Props, selectValue: OptionsType): MenuOptions {
+  //   const { inputValue = '', options } = props;
+  //   const { overscanStartIndex, overscanStopIndex } = this.state;
+  //
+  //   // const toOption = (option, id) => {
+  //   //   const isDisabled = this.isOptionDisabled(option, selectValue);
+  //   //   const isSelected = this.isOptionSelected(option, selectValue);
+  //   //   const label = this.getOptionLabel(option);
+  //   //   const value = this.getOptionValue(option);
+  //   //
+  //   //   if (
+  //   //     (this.shouldHideSelectedOptions() && isSelected) ||
+  //   //     !this.filterOption({ label, value, data: option }, inputValue)
+  //   //   ) {
+  //   //     return;
+  //   //   }
+  //   //
+  //   //   const onHover = isDisabled ? undefined : () => this.onOptionHover(option);
+  //   //   const onSelect = isDisabled ? undefined : () => this.selectOption(option);
+  //   //   const optionId = `${this.getElementId('option')}-${id}`;
+  //   //
+  //   //   return {
+  //   //     innerProps: {
+  //   //       id: optionId,
+  //   //       onClick: onSelect,
+  //   //       onMouseMove: onHover,
+  //   //       onMouseOver: onHover,
+  //   //       role: 'option',
+  //   //       tabIndex: -1,
+  //   //     },
+  //   //     data: option,
+  //   //     isDisabled,
+  //   //     isSelected,
+  //   //     key: optionId,
+  //   //     label,
+  //   //     type: 'option',
+  //   //     value,
+  //   //   };
+  //   // };
+  //
+  //   const reducer = (acc, item, itemIndex) => {
+  //     if (item.options) {
+  //       // TODO needs a tidier implementation
+  //       if (!this.hasGroups) this.hasGroups = true;
+  //
+  //       const { options: items } = item;
+  //       const children = items
+  //       .map((child, i) => {
+  //         const option = toOption(child, `${itemIndex}-${i}`);
+  //         if (option && !option.isDisabled) acc.focusable.push(child);
+  //         return option;
+  //       })
+  //       .filter(Boolean);
+  //       if (children.length) {
+  //         const groupId = `${this.getElementId('group')}-${itemIndex}`;
+  //         acc.render.push({
+  //           type: 'group',
+  //           key: groupId,
+  //           data: item,
+  //           options: children,
+  //         });
+  //       }
+  //     } else {
+  //       const option = this.props.isWindowed
+  //         ? this.toOption(item, `${itemIndex}`, selectValue)
+  //         : toOption(item, `${itemIndex}`);
+  //       console.log('option build menu', option)
+  //       if (option) {
+  //         acc.render.push(option);
+  //         if (!option.isDisabled) acc.focusable.push(item);
+  //       }
+  //     }
+  //     return acc;
+  //   };
+  //   const initialValue = { render: [], focusable: [] };
+  //
+  //   return overscanStartIndex !== null && overscanStopIndex !== null
+  //     ? options.slice(overscanStartIndex, overscanStopIndex + 1).reduce(reducer, initialValue)
+  //     : options.reduce(reducer, initialValue);
+  // }
 
   // ==============================
   // Renderers
@@ -1642,7 +1764,9 @@ export default class Select extends Component<Props, State> {
     let menuUI;
 
     if (this.hasOptions()) {
-      menuUI = menuOptions.render.map(item => {
+      menuUI = this.props.isWindowed
+        ? null
+        : menuOptions.render.map(item => {
         if (item.type === 'group') {
           const { type, ...group } = item;
           const headingId = `${item.key}-heading`;
@@ -1709,6 +1833,9 @@ export default class Select extends Component<Props, State> {
                   innerRef={this.getMenuListRef}
                   isLoading={isLoading}
                   maxHeight={maxHeight}
+                  render={render}
+                  toOption={this.toOption}
+                  menuOptions={menuOptions.render}
                 >
                   {menuUI}
                 </MenuList>
